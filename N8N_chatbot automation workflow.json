@@ -1,0 +1,433 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2740,
+        -1520
+      ],
+      "id": "a1abb9a8-8765-4cb8-8ad8-f149f1935d05",
+      "name": "When clicking ‘Test workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://www.scrapingbee.com/blog/",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2560,
+        -1520
+      ],
+      "id": "2b0ac8f7-344e-49b2-b640-8a795d2f0387",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "cssSelector": "h1, h2, h3, p, li",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -2360,
+        -1520
+      ],
+      "id": "26587aec-133e-4ab9-ae64-c8c4fb93afa6",
+      "name": "HTML"
+    },
+    {
+      "parameters": {
+        "jsCode": "const obj = $input.item.json;\n\n// Get content using the actual key (which is an empty string \"\")\nconst rawChunks = obj[\"\"] || [];\n\nif (!Array.isArray(rawChunks) || rawChunks.length === 0) {\n  return [{ json: { message: \"No valid chunks found.\" } }];\n}\n\n// Join all strings into one\nconst input = rawChunks.join(\" \").trim();\n\n// Optional: clean up newlines, extra spaces\nconst cleanedInput = input.replace(/\\s+/g, \" \");\n\nreturn [{ json: { cleanedInput } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2180,
+        -1520
+      ],
+      "id": "da085ad9-67e3-4f8d-ac62-86ac80ccfa15",
+      "name": "Code",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cohere.ai/v1/embed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer Zmo2OzEEvS4yrIvTdrWZEuwGN2WBqHkjm7AKVPBR"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"texts\": [\n    \"{{ $json.cleanedInput }}\"\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2000,
+        -1520
+      ],
+      "id": "74c8d8f6-8f12-4b3b-8c30-335bfd6df072",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "chatbot_vectors",
+          "mode": "id"
+        },
+        "embeddingBatchSize": 50,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.1,
+      "position": [
+        -1600,
+        -1480
+      ],
+      "id": "fad47f37-8a1e-4586-a747-86fe9c01f949",
+      "name": "Supabase Vector Store",
+      "credentials": {
+        "supabaseApi": {
+          "id": "30Asoxvyq9hN2cLv",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        -1520,
+        -1200
+      ],
+      "id": "552ec98e-acca-4d8a-9517-2add07cc6ca2",
+      "name": "Default Data Loader1"
+    },
+    {
+      "parameters": {
+        "separator": ".",
+        "chunkOverlap": 200
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        -1340,
+        -1080
+      ],
+      "id": "54e2fc19-afad-4382-8dae-33b72c51b9cc",
+      "name": "Character Text Splitter"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        -1640,
+        -1220
+      ],
+      "id": "27bf878d-bdfc-4ef8-8699-b3dc782cdf24",
+      "name": "Embeddings Cohere",
+      "credentials": {
+        "cohereApi": {
+          "id": "FCMqT84L6KZYEWeJ",
+          "name": "CohereApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nreturn items.map(item => {\n  const texts = item.json.texts || [\"\"];\n  const embeddings = item.json.embeddings || [[]];\n\n  return {\n    json: {\n      content: texts[0] || \"\",\n      embedding: embeddings[0] || [],\n      metadata: {\n        id: item.json.id || \"\",\n        source: item.json.source || \"default_source\",\n        timestamp: new Date().toISOString()\n      }\n    }\n  };\n});\n\n\n\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1820,
+        -1520
+      ],
+      "id": "f06e2f7e-94e5-42fb-9ec5-b5b0d08f9f49",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            },
+            {
+              "name": "apikey",
+              "value": "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"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"llama3-70b-8192\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a sentiment analysis expert. Analyze the provided text and return ONLY a valid JSON object in the format: {\\\"sentiment\\\": \\\"Positive|Neutral|Negative\\\", \\\"confidence\\\": 0.0-1.0}. Do NOT return any explanation or other text.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"I don't know how I feel about this product. It's okay I guess.\"\n    }\n  ]\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1240,
+        -1440
+      ],
+      "id": "05f6a194-c1bd-431c-b904-aebc72f85337",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "inputText": "={{$json[\"sentimentAnalysis\"][\"sentiment\"]}}\n\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.sentimentAnalysis",
+      "typeVersion": 1,
+      "position": [
+        -1140,
+        -1160
+      ],
+      "id": "92d8437b-bef9-4ca9-a1ed-fc37ad585ead",
+      "name": "Sentiment Analysis"
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxTokensToSample": 4096,
+          "temperature": 0.7
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -1080,
+        -960
+      ],
+      "id": "c1ea160d-92dc-4e79-bd20-6ebec13ff87b",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "E5n4ZjI5bMu2tZkg",
+          "name": "Groq account"
+        }
+      },
+      "notes": "\n- Neutral\n- Negative\n\nRespond only with the following JSON format (no extra text):\n{\n  \"sentiment\": \"Positive\"\n}\n"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nconst content = $json.choices[0].message.content;\n\n// Extract JSON block (first one found)\nconst match = content.match(/{[\\s\\S]*?}/);\n\nlet sentiment;\ntry {\n  sentiment = match ? JSON.parse(match[0]) : { sentiment: \"Unknown\", confidence: 0 };\n} catch (e) {\n  sentiment = { sentiment: \"ParsingError\", confidence: 0 };\n}\n\nreturn {\n  json: {\n    sentimentAnalysis: sentiment\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1080,
+        -1360
+      ],
+      "id": "65620b4e-1915-4c3e-b408-b32962b7162e",
+      "name": "Code2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader1": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader1",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Cohere": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Sentiment Analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "Sentiment Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "cf6325dd-9f0b-4e48-ad56-1c2ada0d2adc",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e9a55d19c2380326d7f75255384794c2040ade3c11adb32b5b340ee9daa55358"
+  },
+  "id": "cPdrnQRGhm0znagC",
+  "tags": []
+}
